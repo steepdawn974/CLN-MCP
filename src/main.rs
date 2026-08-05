@@ -1,4 +1,5 @@
 mod client;
+#[cfg(feature = "grpc")]
 mod error;
 mod utils;
 
@@ -134,9 +135,11 @@ fn parse_args() -> Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // MCP stdio servers must log to stderr; stdout is the JSON-RPC protocol channel
     tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
         .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug")),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .init();
 
@@ -193,10 +196,9 @@ async fn main() -> Result<()> {
         .serve(stdio())
         .await
         .inspect_err(|e| {
-            println!("Error starting server: {e}");
+            eprintln!("Error starting server: {e}");
         })?;
 
     service.waiting().await?;
     Ok(())
 }
-

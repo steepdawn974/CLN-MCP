@@ -180,9 +180,11 @@ pub struct SignMessageParams {
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct CreateRuneParams {
-    /// Optional restrictions array (e.g. [["method=getinfo"]])
+    /// Optional restrictions as an array of arrays of condition strings,
+    /// e.g. [["method=getinfo"], ["rate=60"]]. Each inner array is a set of
+    /// alternative conditions for one restriction.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub restrictions: Option<Vec<String>>,
+    pub restrictions: Option<Vec<Vec<String>>>,
     /// If true, create a read-only rune
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub readonly: Option<bool>,

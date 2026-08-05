@@ -3,35 +3,36 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 
 /// Setup a REST-based test environment.
-/// Requires a running CLN node with clnrest enabled on port 3010 and a valid rune.
-/// Set the CLN_RUNE environment variable to the rune token.
-async fn setup_rest_env() -> Result<NodeService, Box<dyn std::error::Error>> {
-    let rune = std::env::var("CLN_RUNE")
-        .map_err(|_| "CLN_RUNE environment variable not set. Create a rune with: lightning-cli createrune")?;
-    let url = std::env::var("CLN_REST_URL")
-        .unwrap_or_else(|_| "https://localhost:3010".to_string());
+/// Returns None when CLN_RUNE is not set, so tests skip gracefully without a live node.
+/// Requires a running CLN node with clnrest enabled (default https://localhost:3010).
+/// Set the CLN_RUNE environment variable to the rune token, CLN_REST_URL to override the endpoint.
+async fn setup_rest_env() -> Option<NodeService> {
+    let rune = std::env::var("CLN_RUNE").ok()?;
+    let url =
+        std::env::var("CLN_REST_URL").unwrap_or_else(|_| "https://localhost:3010".to_string());
 
-    let backend = RestBackend::new(&url, &rune, None).await?;
-    Ok(NodeService::new(Arc::new(backend)))
+    let backend = RestBackend::new(&url, &rune, None)
+        .await
+        .expect("Failed to create REST backend");
+    Some(NodeService::new(Arc::new(backend)))
 }
 
 #[tokio::test]
 async fn test_server_initialization() {
-    let result = setup_rest_env().await;
-    assert!(
-        result.is_ok(),
-        "Failed to initialize server: {:?}",
-        result.err()
-    );
+    let Some(_service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 }
 
 // === Read-only tool tests ===
 
 #[tokio::test]
 async fn test_get_info() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.get_info().await;
     assert!(result.is_ok(), "get_info failed: {:?}", result.err());
@@ -50,9 +51,10 @@ async fn test_get_info() {
 
 #[tokio::test]
 async fn test_list_configs() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_configs().await;
     assert!(result.is_ok(), "list_configs failed: {:?}", result.err());
@@ -68,9 +70,10 @@ async fn test_list_configs() {
 
 #[tokio::test]
 async fn test_list_addresses() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_addresses().await;
     assert!(result.is_ok(), "list_addresses failed: {:?}", result.err());
@@ -86,9 +89,10 @@ async fn test_list_addresses() {
 
 #[tokio::test]
 async fn test_list_channels() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_channels().await;
     assert!(result.is_ok(), "list_channels failed: {:?}", result.err());
@@ -104,9 +108,10 @@ async fn test_list_channels() {
 
 #[tokio::test]
 async fn test_list_peer_channels() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_peer_channels().await;
     assert!(
@@ -126,9 +131,10 @@ async fn test_list_peer_channels() {
 
 #[tokio::test]
 async fn test_list_closed_channels() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_closed_channels().await;
     assert!(
@@ -148,9 +154,10 @@ async fn test_list_closed_channels() {
 
 #[tokio::test]
 async fn test_list_htlcs() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_htlcs().await;
     assert!(result.is_ok(), "list_htlcs failed: {:?}", result.err());
@@ -166,9 +173,10 @@ async fn test_list_htlcs() {
 
 #[tokio::test]
 async fn test_list_pays() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_pays().await;
     assert!(result.is_ok(), "list_pays failed: {:?}", result.err());
@@ -184,9 +192,10 @@ async fn test_list_pays() {
 
 #[tokio::test]
 async fn test_list_send_pays() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_send_pays().await;
     assert!(result.is_ok(), "list_send_pays failed: {:?}", result.err());
@@ -202,9 +211,10 @@ async fn test_list_send_pays() {
 
 #[tokio::test]
 async fn test_list_forwards() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_forwards().await;
     assert!(result.is_ok(), "list_forwards failed: {:?}", result.err());
@@ -220,9 +230,10 @@ async fn test_list_forwards() {
 
 #[tokio::test]
 async fn test_list_invoices() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_invoices().await;
     assert!(result.is_ok(), "list_invoices failed: {:?}", result.err());
@@ -238,9 +249,10 @@ async fn test_list_invoices() {
 
 #[tokio::test]
 async fn test_list_peers() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_peers().await;
     assert!(result.is_ok(), "list_peers failed: {:?}", result.err());
@@ -256,9 +268,10 @@ async fn test_list_peers() {
 
 #[tokio::test]
 async fn test_list_nodes() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_nodes().await;
     assert!(result.is_ok(), "list_nodes failed: {:?}", result.err());
@@ -274,9 +287,10 @@ async fn test_list_nodes() {
 
 #[tokio::test]
 async fn test_list_funds() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_funds().await;
     assert!(result.is_ok(), "list_funds failed: {:?}", result.err());
@@ -293,9 +307,10 @@ async fn test_list_funds() {
 
 #[tokio::test]
 async fn test_list_offers() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_offers().await;
     assert!(result.is_ok(), "list_offers failed: {:?}", result.err());
@@ -311,9 +326,10 @@ async fn test_list_offers() {
 
 #[tokio::test]
 async fn test_list_datastore() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.list_datastore().await;
     assert!(result.is_ok(), "list_datastore failed: {:?}", result.err());
@@ -329,9 +345,10 @@ async fn test_list_datastore() {
 
 #[tokio::test]
 async fn test_feerates() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.feerates().await;
     assert!(result.is_ok(), "feerates failed: {:?}", result.err());
@@ -349,9 +366,10 @@ async fn test_feerates() {
 
 #[tokio::test]
 async fn test_get_log() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.get_log().await;
     assert!(result.is_ok(), "get_log failed: {:?}", result.err());
@@ -367,9 +385,10 @@ async fn test_get_log() {
 
 #[tokio::test]
 async fn test_bkpr_channels_apy() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.bkpr_channels_apy().await;
     assert!(
@@ -389,9 +408,10 @@ async fn test_bkpr_channels_apy() {
 
 #[tokio::test]
 async fn test_bkpr_list_balances() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.bkpr_list_balances().await;
     assert!(
@@ -411,9 +431,10 @@ async fn test_bkpr_list_balances() {
 
 #[tokio::test]
 async fn test_bkpr_list_income() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.bkpr_list_income().await;
     assert!(
@@ -433,9 +454,10 @@ async fn test_bkpr_list_income() {
 
 #[tokio::test]
 async fn test_bkpr_list_account_events() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service.bkpr_list_account_events().await;
     assert!(
@@ -457,11 +479,12 @@ async fn test_bkpr_list_account_events() {
 
 #[tokio::test]
 async fn test_decode() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
-    // Test with a known valid bolt11-like string (regtest)
+    // An incomplete bolt11 string must produce an ErrorData, not a panic
     let result = service
         .decode(rmcp::handler::server::wrapper::Parameters(
             cln_mcp::client::params::DecodeParams {
@@ -469,15 +492,19 @@ async fn test_decode() {
             },
         ))
         .await;
-    // decode may fail for invalid strings, that's fine — we're testing the tool call works
-    let _ = result;
+    assert!(
+        result.is_err(),
+        "decode of an invalid string should return an error, got: {:?}",
+        result.ok()
+    );
 }
 
 #[tokio::test]
 async fn test_show_runes() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service
         .show_runes(rmcp::handler::server::wrapper::Parameters(
@@ -489,9 +516,10 @@ async fn test_show_runes() {
 
 #[tokio::test]
 async fn test_call_rpc_method() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service
         .call_rpc_method(rmcp::handler::server::wrapper::Parameters(
@@ -515,9 +543,10 @@ async fn test_call_rpc_method() {
 
 #[tokio::test]
 async fn test_call_rpc_method_listpeers() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service
         .call_rpc_method(rmcp::handler::server::wrapper::Parameters(
@@ -532,9 +561,10 @@ async fn test_call_rpc_method_listpeers() {
 
 #[tokio::test]
 async fn test_call_rpc_method_with_params() {
-    let service = setup_rest_env()
-        .await
-        .expect("Failed to setup test environment");
+    let Some(service) = setup_rest_env().await else {
+        eprintln!("Skipping: CLN_RUNE not set");
+        return;
+    };
 
     let result = service
         .call_rpc_method(rmcp::handler::server::wrapper::Parameters(

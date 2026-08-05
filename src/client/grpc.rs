@@ -21,18 +21,6 @@ impl GrpcBackend {
     }
 }
 
-macro_rules! grpc_call {
-    ($self:expr, $method:ident, $req:expr) => {{
-        let mut client = $self.client.lock().await;
-        let res = client.$method(Request::new($req)).await;
-        match res {
-            Ok(response) => serde_json::to_value(response.into_inner())
-                .map_err(|e| anyhow!("Failed to serialize gRPC response: {}", e)),
-            Err(e) => Err(anyhow!("gRPC call failed: {}", e)),
-        }
-    }};
-}
-
 #[async_trait]
 impl ClnBackend for GrpcBackend {
     async fn call(&self, method: &str, _params: Value) -> Result<Value> {
