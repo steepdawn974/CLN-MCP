@@ -1,341 +1,280 @@
-use cln_grpc::pb::node_client::NodeClient;
-use cln_grpc::pb::{
-    BkprchannelsapyRequest, BkprlistaccounteventsRequest, BkprlistbalancesRequest,
-    BkprlistincomeRequest, FeeratesRequest, GetinfoRequest, GetlogRequest, ListaddressesRequest,
-    ListchannelsRequest, ListclosedchannelsRequest, ListconfigsRequest, ListdatastoreRequest,
-    ListforwardsRequest, ListfundsRequest, ListhtlcsRequest, ListinvoicesRequest, ListnodesRequest,
-    ListoffersRequest, ListpaysRequest, ListpeerchannelsRequest, ListpeersRequest,
-    ListsendpaysRequest,
+use rmcp::{
+    handler::server::wrapper::Parameters,
+    model::*,
+    tool, tool_handler, tool_router,
 };
-use rmcp::{model::*, tool, Error as McpError};
 use serde::Serialize;
+use serde_json::{json, Value};
 use std::sync::Arc;
-use tokio::sync::Mutex;
-use tonic::{transport::Channel, Request, Response};
 use tracing::debug;
 
-macro_rules! doc_from_file {
-    ($path:expr) => {
-        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/docs/", $path))
-    };
-}
+use super::backend::ClnBackend;
+use super::params::*;
+
 
 #[derive(Clone)]
 pub struct NodeService {
-    client: Arc<Mutex<NodeClient<Channel>>>,
+    backend: Arc<dyn ClnBackend>,
 }
 
-fn get_response<T>(res: Result<Response<T>, tonic::Status>) -> Result<CallToolResult, McpError>
-where
-    T: Serialize,
-{
-    match res {
-        Ok(response) => {
-            // Convert the response into a JSON-serializable format
-            let response_data = serde_json::to_value(response.into_inner())
-                .map_err(|_| McpError::internal_error("Failed to serialize response", None))?;
-
-            Ok(CallToolResult::success(vec![
-                Content::json(response_data).unwrap()
-            ]))
-        }
-        Err(e) => Err(McpError::internal_error(
-            format!("Failed to communicate with lightning node: {e}"),
-            None,
-        )),
-    }
+fn to_call_result(value: Value) -> Result<CallToolResult, ErrorData> {
+    let content = ContentBlock::json(value).unwrap();
+    Ok(CallToolResult::success(vec![content]))
 }
 
-#[tool(tool_box)]
+fn backend_error(e: anyhow::Error) -> ErrorData {
+    ErrorData::internal_error(
+        format!("Failed to communicate with lightning node: {e}"),
+        None,
+    )
+}
+
+fn serialize_params<T: Serialize>(params: &T) -> Value {
+    serde_json::to_value(params).unwrap_or_else(|_| json!({}))
+}
+
+#[tool_router]
 impl NodeService {
-    pub fn new(channel: Channel) -> Self {
-        Self {
-            client: Arc::new(Mutex::new(NodeClient::new(channel))),
-        }
+    pub fn new(backend: Arc<dyn ClnBackend>) -> Self {
+        Self { backend }
     }
 
-    // Node Information
-    #[tool(description = doc_from_file!("getinfo.md"))]
-    pub async fn get_info(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(GetinfoRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.getinfo(request).await;
-        debug!("get_info called!");
-        get_response(res)
+    async fn call_backend(&self, method: &str, params: Value) -> Result<CallToolResult, ErrorData> {
+        debug!("Tool call: {} with params: {}", method, params);
+        let result = self.backend.call(method, params).await.map_err(backend_error)?;
+        to_call_result(result)
     }
 
-    #[tool(description = doc_from_file!("listconfigs.md"))]
-    pub async fn list_configs(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListconfigsRequest::default());
-        let mut client = self.client.lock().await;
+    // === Existing read-only tools ===
 
-        let res = client.list_configs(request).await;
-        debug!("list_configs called!");
-        get_response(res)
+    #[tool(description = "getinfo - Get node information including id, alias, color, num_peers, num_active_channels, version, blockheight, network, fees_collected_msat, address, binding")]
+    pub async fn get_info(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("getinfo", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("listaddresses.md"))]
-    pub async fn list_addresses(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListaddressesRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_addresses(request).await;
-        debug!("list_addresses called!");
-        get_response(res)
+    #[tool(description = "listconfigs - List all configuration options of the Core Lightning node")]
+    pub async fn list_configs(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listconfigs", json!({})).await
     }
 
-    // Channel Information
-    #[tool(description = doc_from_file!("listchannels.md"))]
-    pub async fn list_channels(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListchannelsRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_channels(request).await;
-        debug!("list_channels called!");
-        get_response(res)
+    #[tool(description = "listaddresses - List all addresses of the node (both announced and binding addresses)")]
+    pub async fn list_addresses(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listaddresses", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("listpeerchannels.md"))]
-    pub async fn list_peer_channels(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListpeerchannelsRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_peer_channels(request).await;
-        debug!("list_peer_channels called!");
-        get_response(res)
+    #[tool(description = "listchannels - Query active lightning channels in the entire network. Optionally filter by short_channel_id, source, or destination")]
+    pub async fn list_channels(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listchannels", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("listclosedchannels.md"))]
-    pub async fn list_closed_channels(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListclosedchannelsRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_closed_channels(request).await;
-        debug!("list_closed_channels called!");
-        get_response(res)
+    #[tool(description = "listpeerchannels - List channels with directly connected peers, showing their current state")]
+    pub async fn list_peer_channels(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listpeerchannels", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("listhtlcs.md"))]
-    pub async fn list_htlcs(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListhtlcsRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_htlcs(request).await;
-        debug!("list_htlcs called!");
-        get_response(res)
+    #[tool(description = "listclosedchannels - List channels that have been closed, with details on close cause and fees")]
+    pub async fn list_closed_channels(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listclosedchannels", json!({})).await
     }
 
-    // Payment Information
-    #[tool(description = doc_from_file!("listpays.md"))]
-    pub async fn list_pays(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListpaysRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_pays(request).await;
-        debug!("list_pays called!");
-        get_response(res)
+    #[tool(description = "listhtlcs - List all HTLCs (Hash Time Locked Contracts) with their current state")]
+    pub async fn list_htlcs(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listhtlcs", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("listsendpays.md"))]
-    pub async fn list_send_pays(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListsendpaysRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_send_pays(request).await;
-        debug!("list_send_pays called!");
-        get_response(res)
+    #[tool(description = "listpays - List payment results, optionally filtered by bolt11 invoice string")]
+    pub async fn list_pays(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listpays", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("listforwards.md"))]
-    pub async fn list_forwards(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListforwardsRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_forwards(request).await;
-        debug!("list_forwards called!");
-        get_response(res)
+    #[tool(description = "listsendpays - List outgoing payments with more detail than listpays, optionally filtered by bolt11")]
+    pub async fn list_send_pays(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listsendpays", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("listinvoices.md"))]
-    pub async fn list_invoices(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListinvoicesRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_invoices(request).await;
-        debug!("list_invoices called!");
-        get_response(res)
+    #[tool(description = "listforwards - List all HTLCs that have been forwarded by the node, optionally filtered by status, in_channel, or out_channel")]
+    pub async fn list_forwards(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listforwards", json!({})).await
     }
 
-    // #[tool(description = doc_from_file!("listinvoicerequests.md"))]
-    // pub async fn list_invoice_requests(&self) -> Result<CallToolResult, McpError> {
-    //     let request = Request::new(ListinvoicerequestsRequest::default());
-    //     let mut client = self.client.lock().await;
-
-    //     let res = client.list_invoice_requests(request).await;
-    //     get_response(res)
-    // }
-
-    // Network Information
-    #[tool(description = doc_from_file!("listpeers.md"))]
-    pub async fn list_peers(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListpeersRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_peers(request).await;
-        debug!("list_peers called!");
-        get_response(res)
+    #[tool(description = "listinvoices - Query invoice status. Optionally filter by label, invstring, payment_hash, or offer_id")]
+    pub async fn list_invoices(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listinvoices", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("listnodes.md"))]
-    pub async fn list_nodes(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListnodesRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_nodes(request).await;
-        debug!("list_nodes called!");
-        get_response(res)
+    #[tool(description = "listpeers - List connected lightning nodes. Optionally filter by id or show log level")]
+    pub async fn list_peers(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listpeers", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("listfunds.md"))]
-    pub async fn list_funds(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListfundsRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_funds(request).await;
-        debug!("list_funds called!");
-        get_response(res)
+    #[tool(description = "listnodes - Lookup node info from the network gossip map, optionally filtered by pubkey")]
+    pub async fn list_nodes(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listnodes", json!({})).await
     }
 
-    // #[tool(description = doc_from_file!("getroute.md"))]
-    // pub async fn get_route(&self) -> Result<CallToolResult, McpError> {
-    //     let request = Request::new(GetrouteRequest::default());
-    //     let mut client = self.client.lock().await;
-
-    //     let res = client.get_route(request).await;
-    //     get_response(res)
-    // }
-
-    // Offer Information
-    #[tool(description = doc_from_file!("listoffers.md"))]
-    pub async fn list_offers(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListoffersRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_offers(request).await;
-        debug!("list_offers called!");
-        get_response(res)
+    #[tool(description = "listfunds - Show all funds currently managed by the node (UTXOs and channel funds). Optionally include spent outputs")]
+    pub async fn list_funds(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listfunds", json!({})).await
     }
 
-    // Database Information
-    #[tool(description = doc_from_file!("listdatastore.md"))]
-    pub async fn list_datastore(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(ListdatastoreRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.list_datastore(request).await;
-        debug!("list_datastore called!");
-        get_response(res)
+    #[tool(description = "listoffers - List all bolt12 offers on the node")]
+    pub async fn list_offers(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listoffers", json!({})).await
     }
 
-    // Bookkeeping Information
-    #[tool(description = doc_from_file!("bkpr-channelsapy.md"))]
-    pub async fn bkpr_channels_apy(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(BkprchannelsapyRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.bkpr_channels_apy(request).await;
-        debug!("bkpr_channels_pay called!");
-        get_response(res)
+    #[tool(description = "listdatastore - List data stored in the node datastore")]
+    pub async fn list_datastore(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listdatastore", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("bkpr-listbalances.md"))]
-    pub async fn bkpr_list_balances(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(BkprlistbalancesRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.bkpr_list_balances(request).await;
-        debug!("bkpr_list_balances called!");
-        get_response(res)
+    #[tool(description = "feerates - Look up fee rates for various styles (perkb or perkw)")]
+    pub async fn feerates(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("feerates", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("bkpr-listincome.md"))]
-    pub async fn bkpr_list_income(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(BkprlistincomeRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.bkpr_list_income(request).await;
-        debug!("bkpr_list_income called!");
-        get_response(res)
+    #[tool(description = "getlog - Show log entries from the node, optionally filtered by level")]
+    pub async fn get_log(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("getlog", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("bkpr-listaccountevents.md"))]
-    pub async fn bkpr_list_account_events(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(BkprlistaccounteventsRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.bkpr_list_account_events(request).await;
-        debug!("bkpr_list_account_events called!");
-        get_response(res)
+    #[tool(description = "bkpr-channelsapy - List APY stats for channels, optionally filtered by account")]
+    pub async fn bkpr_channels_apy(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("bkpr-channelsapy", json!({})).await
     }
 
-    // Utility Commands
-    // #[tool(description = doc_from_file!("decode.md"))]
-    // pub async fn decode(&self) -> Result<CallToolResult, McpError> {
-    //     let request = Request::new(DecodeRequest::default());
-    //     let mut client = self.client.lock().await;
-
-    //     let res = client.decode(request).await;
-    //     get_response(res)
-    // }
-
-    // #[tool(description = doc_from_file!("decodepay.md"))]
-    // pub async fn decode_pay(&self) -> Result<CallToolResult, McpError> {
-    //     let request = Request::new(DecodepayRequest::default());
-    //     let mut client = self.client.lock().await;
-
-    //     let res = client.decode_pay(request).await;
-    //     get_response(res)
-    // }
-
-    // #[tool(description = doc_from_file!("checkmessage.md"))]
-    // pub async fn check_message(&self) -> Result<CallToolResult, McpError> {
-    //     let request = Request::new(CheckmessageRequest::default());
-    //     let mut client = self.client.lock().await;
-
-    //     let res = client.check_message(request).await;
-    //     get_response(res)
-    // }
-
-    #[tool(description = doc_from_file!("feerates.md"))]
-    pub async fn feerates(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(FeeratesRequest::default());
-        let mut client = self.client.lock().await;
-
-        let res = client.feerates(request).await;
-        debug!("feerates called!");
-        get_response(res)
+    #[tool(description = "bkpr-listbalances - List current and historical account balances")]
+    pub async fn bkpr_list_balances(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("bkpr-listbalances", json!({})).await
     }
 
-    #[tool(description = doc_from_file!("getlog.md"))]
-    pub async fn get_log(&self) -> Result<CallToolResult, McpError> {
-        let request = Request::new(GetlogRequest::default());
-        let mut client = self.client.lock().await;
+    #[tool(description = "bkpr-listincome - List income events (routing fees, on-chain transactions, etc.)")]
+    pub async fn bkpr_list_income(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("bkpr-listincome", json!({})).await
+    }
 
-        let res = client.get_log(request).await;
-        debug!("get_log called!");
-        get_response(res)
+    #[tool(description = "bkpr-listaccountevents - List detailed accounting events (channel opens, closes, HTLCs, etc.)")]
+    pub async fn bkpr_list_account_events(&self) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("bkpr-listaccountevents", json!({})).await
+    }
+
+    // === New read-only tools with parameters ===
+
+    #[tool(description = "getroute - Find the best route for a payment. Requires id (pubkey) and amount_msat. Optional riskfactor")]
+    pub async fn get_route(&self, Parameters(params): Parameters<GetRouteParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("getroute", serialize_params(&params)).await
+    }
+
+    #[tool(description = "decode - Decode a lightning string (bolt11, bolt12, rune, etc.)")]
+    pub async fn decode(&self, Parameters(params): Parameters<DecodeParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("decode", serialize_params(&params)).await
+    }
+
+    #[tool(description = "decode - Decode a lightning string (bolt11, bolt12, rune, etc.)"PAY)]
+    pub async fn decode_pay(&self, Parameters(params): Parameters<DecodePayParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("decodepay", serialize_params(&params)).await
+    }
+
+    #[tool(description = "checkmessage - Verify a signature on a message. Requires message and signature, optional pubkey")]
+    pub async fn check_message(&self, Parameters(params): Parameters<CheckMessageParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("checkmessage", serialize_params(&params)).await
+    }
+
+    #[tool(description = "listtransactions - List on-chain transactions from the wallet. Optional start and limit for pagination")]
+    pub async fn list_transactions(&self, Parameters(params): Parameters<ListTransactionsParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("listtransactions", serialize_params(&params)).await
+    }
+
+    #[tool(description = "showrunes - List runes on the node. Optionally filter by rune id")]
+    pub async fn show_runes(&self, Parameters(params): Parameters<ShowRunesParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("showrunes", serialize_params(&params)).await
+    }
+
+    // === New write/mutation tools ===
+
+    #[tool(description = "connect - Connect to a lightning node. Requires id (pubkey, optionally with @host:port), optional host")]
+    pub async fn connect_peer(&self, Parameters(params): Parameters<ConnectPeerParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("connect", serialize_params(&params)).await
+    }
+
+    #[tool(description = "disconnect - Disconnect from a peer. Requires id (pubkey), optional force flag")]
+    pub async fn disconnect_peer(&self, Parameters(params): Parameters<DisconnectPeerParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("disconnect", serialize_params(&params)).await
+    }
+
+    #[tool(description = "fundchannel - Open a channel with a connected peer. Requires id (pubkey) and amount (sat). Optional feerate and announce")]
+    pub async fn fund_channel(&self, Parameters(params): Parameters<FundChannelParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("fundchannel", serialize_params(&params)).await
+    }
+
+    #[tool(description = "close - Close a channel. Requires id (pubkey or channel_id). Optional unilateraltimeout and fee_negotiation_step")]
+    pub async fn close_channel(&self, Parameters(params): Parameters<CloseChannelParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("close", serialize_params(&params)).await
+    }
+
+    #[tool(description = "setchannel - Update channel fee policy. Requires id (pubkey, short_channel_id, or all). Optional feebase, feeppm, htlcmin, htlcmax")]
+    pub async fn set_channel(&self, Parameters(params): Parameters<SetChannelParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("setchannel", serialize_params(&params)).await
+    }
+
+    #[tool(description = "invoice - Create a bolt11 invoice. Requires amount_msat, label, description. Optional expiry")]
+    pub async fn create_invoice(&self, Parameters(params): Parameters<CreateInvoiceParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("invoice", serialize_params(&params)).await
+    }
+
+    #[tool(description = "pay - Pay a bolt11 invoice. Requires bolt11. Optional amount_msat and label")]
+    pub async fn pay_invoice(&self, Parameters(params): Parameters<PayInvoiceParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("pay", serialize_params(&params)).await
+    }
+
+    #[tool(description = "keysend - Send funds to a node without an invoice. Requires destination (pubkey) and amount_msat. Optional label")]
+    pub async fn keysend(&self, Parameters(params): Parameters<KeysendParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("keysend", serialize_params(&params)).await
+    }
+
+    #[tool(description = "withdraw - Withdraw on-chain funds. Requires destination (address) and satoshi (amount or all). Optional feerate")]
+    pub async fn withdraw(&self, Parameters(params): Parameters<WithdrawParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("withdraw", serialize_params(&params)).await
+    }
+
+    #[tool(description = "newaddr - Generate a new on-chain address. Optional addresstype (bech32 or p2tr)")]
+    pub async fn new_address(&self, Parameters(params): Parameters<NewAddressParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("newaddr", serialize_params(&params)).await
+    }
+
+    #[tool(description = "signmessage - Sign a message with the node private key. Requires message")]
+    pub async fn sign_message(&self, Parameters(params): Parameters<SignMessageParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("signmessage", serialize_params(&params)).await
+    }
+
+    #[tool(description = "createrune - Create a new rune. Optional restrictions array and readonly flag")]
+    pub async fn create_rune(&self, Parameters(params): Parameters<CreateRuneParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("createrune", serialize_params(&params)).await
+    }
+
+    #[tool(description = "offer - Create a bolt12 offer. Requires description. Optional amount and label")]
+    pub async fn create_offer(&self, Parameters(params): Parameters<CreateOfferParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("offer", serialize_params(&params)).await
+    }
+
+    #[tool(description = "disableoffer - Disable an existing offer. Requires offer_id")]
+    pub async fn disable_offer(&self, Parameters(params): Parameters<DisableOfferParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("disableoffer", serialize_params(&params)).await
+    }
+
+    #[tool(description = "fetchinvoice - Fetch an invoice for a bolt12 offer. Requires offer. Optional amount_msat and quantity")]
+    pub async fn fetch_invoice(&self, Parameters(params): Parameters<FetchInvoiceParams>) -> Result<CallToolResult, ErrorData> {
+        self.call_backend("fetchinvoice", serialize_params(&params)).await
+    }
+
+    // === Generic tool ===
+
+    #[tool(description = "call_rpc_method - Call any CLN RPC method directly. Requires method name. Optional params object")]
+    pub async fn call_rpc_method(&self, Parameters(params): Parameters<CallRpcMethodParams>) -> Result<CallToolResult, ErrorData> {
+        let method = params.method.clone();
+        let rpc_params = params.params.clone().unwrap_or(json!({}));
+        self.call_backend(&method, rpc_params).await
     }
 }
 
-#[tool(tool_box)]
-impl rmcp::ServerHandler for NodeService {
-    fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            protocol_version: ProtocolVersion::V_2024_11_05,
-            instructions: Some("Core Lightning Node".into()),
-            server_info: Implementation::from_build_env(),
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-        }
-    }
-}
+#[tool_handler]
+impl rmcp::ServerHandler for NodeService {}

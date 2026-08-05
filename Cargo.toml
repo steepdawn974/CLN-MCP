@@ -1,25 +1,35 @@
 [package]
 name = "cln-mcp"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Aditya Sharma <aditya.sharma20111@gmail.com>"]
 description = "A Rust-based MCP server for Core Lightning nodes"
 license = "MIT"
 repository = "https://github.com/adi2011/cln-mcp"
 
+[features]
+default = ["rest"]
+rest = []
+grpc = ["dep:cln-grpc", "dep:tonic", "dep:prost", "dep:http"]
+
 [dependencies]
-rmcp = { version = "0.1", features = ["transport-io", "server"] }
-tokio = { version = "1.43.0", features = ["full"] }
-serde_json = "1.0.139"
-serde = { version = "1.0.218", features = ["derive"] }
-cln-grpc = "0.4.0"
-anyhow = "1.0.98"
-tonic = { version = "0.11", features = ["tls"] }
-prost = "0.11"           # ✅ Needed by tonic 0.9
-http = "0.2"             # ✅ Matches tonic 0.9
-thiserror = "2.0.12"
+rmcp = { version = "3.1", features = ["transport-io", "server", "macros"] }
+tokio = { version = "1.43", features = ["full"] }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+anyhow = "1.0"
+thiserror = "2.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+reqwest = { version = "0.13", features = ["json", "rustls"], default-features = false }
+async-trait = "0.1"
+schemars = "1.2"
+
+# Optional gRPC dependencies
+cln-grpc = { version = "0.4", optional = true }
+tonic = { version = "0.11", features = ["tls"], optional = true }
+prost = { version = "0.11", optional = true }
+http = { version = "0.2", optional = true }
 
 [[test]]
 name = "integration_test"

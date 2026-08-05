@@ -10,7 +10,7 @@
 
 </div>
 
-A Rust-based gRPC server that provides a standardized interface to Core Lightning nodes. This server implements the MCP (Model Context Protocol) specification to enable control of the Core Lightning node using LLM.
+A Rust-based MCP (Model Context Protocol) server that provides a standardized interface to Core Lightning nodes. Supports both **REST** (rune auth, no certs needed) and **gRPC** (mTLS) backends. Enables full node management — read-only queries, channel operations, payments, and more — via LLM tools.
 
 ![MCP](./assets/mcp-screenshot.png)
 
@@ -75,18 +75,46 @@ cargo build --release
 
 ## Configuration
 
-The server can be configured using command-line arguments:
+The server supports two backends: **REST** (default, recommended) and **gRPC** (legacy).
+
+### REST Backend (Default)
+
+The REST backend connects to CLN's built-in [clnrest](https://docs.corelightning.org/docs/rest) plugin using a **rune** for authentication. No TLS certificates need to be copied.
+
+**Prerequisites:**
+1. Enable clnrest in your CLN config: `clnrest-port=3010`
+2. Create a rune: `lightning-cli createrune`
 
 ```bash
-cln-mcp [OPTIONS]
-
-Options:
-  --certs-dir <path>    Path to certificates directory
-  --node-address <url>  Node address (default: https://localhost:9736)
-  --help                Shows help message
+cln-mcp --rune <your-rune>
+# or with custom URL:
+cln-mcp --backend rest --rest-url https://localhost:3010 --rune <your-rune>
+# or with CA cert for strict TLS:
+cln-mcp --rune <your-rune> --ca-cert /path/to/ca.pem
 ```
 
-### TLS Certificate Setup
+### gRPC Backend (Legacy)
+
+The gRPC backend uses mTLS certificates. Requires building with `--features grpc` and having protoc installed.
+
+```bash
+cargo build --release --features grpc
+cln-mcp --backend grpc --certs-dir /path/to/certs
+```
+
+### Full CLI Options
+
+```
+--backend <rest|grpc>   Backend type (default: rest)
+--rest-url <url>        REST endpoint (default: https://localhost:3010)
+--rune <rune>           Rune token for REST auth (required for REST)
+--ca-cert <path>        Optional CA cert for REST TLS verification
+--certs-dir <path>      Path to gRPC certificates directory
+--node-address <url>    gRPC node address (default: https://localhost:9736)
+--help                  Shows help message
+```
+
+### TLS Certificate Setup (gRPC only)
 Add the `--grpc-port`(default: 9736) option while running CLN, and it'll automatically generate the appropriate mTLS certificates. 
 
 Copy the following PEM files from the Lightning directory to a separate directory:
@@ -94,7 +122,7 @@ Copy the following PEM files from the Lightning directory to a separate director
 - `client.pem`: Client certificate
 - `client-key.pem`: Client private key
 
-### Claude Setup
+### Claude Setup (REST — Recommended)
  - Install [Claude](https://claude.ai/download)
  - Go to settings -> Developer
  - Edit Config
@@ -102,16 +130,60 @@ Copy the following PEM files from the Lightning directory to a separate director
     {
         "mcpServers" : {
             "cln-mcp" : {
-                "command": "Path/to/cln-mcp" (ex: "/Users/MyPC/cln-mcp/target/release/cln-mcp" or the executable unzipped from the release),
+                "command": "/path/to/cln-mcp",
                 "args": [
-                    "--certs-dir",
-                    "Path/to/certificates" (ex: "/Users/MyPC/cln-mcp/certs")
+                    "--rune",
+                    "your-rune-token-here"
                 ]
             }
         }
     }
  ```
  - Restart Claude
+
+### Claude Setup (gRPC)
+ ```
+    {
+        "mcpServers" : {
+            "cln-mcp" : {
+                "command": "/path/to/cln-mcp",
+                "args": [
+                    "--backend",
+                    "grpc",
+                    "--certs-dir",
+                    "/path/to/certificates"
+                ]
+            }
+        }
+    }
+ ```
+
+## Tools
+
+### Read-Only Tools
+- `get_info`, `list_configs`, `list_addresses`, `list_channels`, `list_peer_channels`, `list_closed_channels`, `list_htlcs`
+- `list_pays`, `list_send_pays`, `list_forwards`, `list_invoices`, `list_peers`, `list_nodes`, `list_funds`
+- `list_offers`, `list_datastore`, `feerates`, `get_log`
+- `bkpr_channels_apy`, `bkpr_list_balances`, `bkpr_list_income`, `bkpr_list_account_events`
+- `get_route`, `decode`, `decode_pay`, `check_message`, `list_transactions`, `show_runes`
+
+### Node Management Tools
+- `connect_peer`, `disconnect_peer`, `fund_channel`, `close_channel`, `set_channel`
+- `create_invoice`, `pay_invoice`, `keysend`, `withdraw`, `new_address`
+- `sign_message`, `create_rune`, `create_offer`, `disable_offer`, `fetch_invoice`
+
+### Generic Tool
+- `call_rpc_method` — Call any CLN RPC method with arbitrary parameters
+
+## Build Features
+
+```bash
+# REST only (default, no protoc needed)
+cargo build --release
+
+# gRPC + REST (requires protoc)
+cargo build --release --features grpc
+```
 
 # Future Goals
  [ ] Enable it to derive parameters for the RPC calls  
