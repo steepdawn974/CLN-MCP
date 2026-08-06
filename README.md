@@ -185,6 +185,37 @@ cargo build --release
 cargo build --release --features grpc
 ```
 
+## Testing
+
+Integration tests require a running CLN node with clnrest enabled. Tests skip gracefully if no credentials are provided.
+
+### Setting Up
+
+Export the following environment variables before running tests:
+
+```bash
+# Required: rune token for REST authentication
+export CLN_RUNE="your-rune-token"
+
+# Optional: REST endpoint URL (defaults to https://localhost:3010)
+export CLN_REST_URL="https://your-node-address:port"
+```
+
+### Running Tests
+
+```bash
+# Run all integration tests
+cargo test --release
+
+# Run a specific test
+cargo test --release test_get_info
+
+# Run with verbose output
+cargo test --release -- --nocapture
+```
+
+Tests run sequentially to avoid overwhelming the node. Each test calls a tool against the live node and asserts the response structure matches the CLN RPC specification.
+
 # Future Goals
  [ ] Enable it to derive parameters for the RPC calls  
  [ ] Choose the most appropriate and useful RPCs for maximum utility  

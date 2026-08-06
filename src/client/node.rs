@@ -763,7 +763,7 @@ impl NodeService {
     )]
     pub async fn node_health(&self) -> Result<CallToolResult, ErrorData> {
         let info_res = self.backend.call("getinfo", json!({})).await;
-        let feerates_res = self.backend.call("feerates", json!({})).await;
+        let feerates_res = self.backend.call("feerates", json!({"style": "perkb"})).await;
         let channels_res = self.backend.call("listpeerchannels", json!({})).await;
 
         let info = info_res.map_err(backend_error)?;
