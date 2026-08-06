@@ -149,9 +149,12 @@ async fn main() -> Result<()> {
 
     let backend: Arc<dyn ClnBackend> = match args.backend.as_str() {
         "rest" => {
-            let rune = args.rune.ok_or_else(|| {
-                anyhow!("--rune is required for REST backend. Create one with: lightning-cli createrune")
-            })?;
+            let rune = args.rune
+                .or_else(|| env::var("CLN_RUNE").ok())
+                .or_else(|| env::var("sleepywhsper_rune").ok())
+                .ok_or_else(|| {
+                    anyhow!("--rune is required for REST backend. Pass --rune, set CLN_RUNE env var, or inject via Infisical. Create one with: lightning-cli createrune")
+                })?;
             info!("Using REST backend at {}", args.rest_url);
             let rest = RestBackend::new(&args.rest_url, &rune, args.ca_cert.as_deref()).await?;
             Arc::new(rest)

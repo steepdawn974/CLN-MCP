@@ -295,6 +295,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cln-grpc",
+ "hex",
  "http 0.2.12",
  "prost 0.11.9",
  "reqwest",
