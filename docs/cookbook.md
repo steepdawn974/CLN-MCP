@@ -810,3 +810,33 @@ lightning-cli listpeers pubkey
 
 Escape hatch for RPC methods not directly exposed as MCP tools. Pass
 any method name and optional params as a JSON object.
+
+### 10.7 Do Not Use `wait` via MCP
+
+```
+# DO NOT DO THIS — it will hang the MCP server:
+MCP tool: call_rpc_method(method: "wait", params: {"subsystem": "forwards", "indexname": "created", "nextvalue": 0})
+```
+
+CLN's `wait` RPC is a long-polling command designed for persistent
+JSON-RPC socket connections. When called through clnrest's HTTP API
+(which the MCP REST backend uses), the response returns but the
+notification subscription is not properly cleaned up. This leaves a
+dangling subscriber that holds a connection slot in clnrest, causing
+intermittent `Failed to connect to MCP server` errors.
+
+**If this happens**, restart the clnrest plugin to clear the stuck
+subscriber:
+
+```bash
+lightning-cli plugin stop /usr/local/libexec/c-lightning/plugins/clnrest
+lightning-cli plugin start /usr/local/libexec/c-lightning/plugins/clnrest
+```
+
+**To get the latest forward index without `wait`**, use `listforwards`
+with a high `start` value and `index=created`, or use the SQL plugin:
+
+```
+MCP tool: call_rpc_method(method: "listforwards", params: {"index": "created", "start": 999999, "limit": 1})
+MCP tool: call_rpc_method(method: "sql", params: {"query": "SELECT MAX(created_index) FROM forwards"})
+```
