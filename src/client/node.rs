@@ -17,11 +17,23 @@ fn to_call_result(value: Value) -> Result<CallToolResult, ErrorData> {
     Ok(CallToolResult::success(vec![content]))
 }
 
-fn backend_error(e: anyhow::Error) -> ErrorData {
-    ErrorData::internal_error(
-        format!("Failed to communicate with lightning node: {e}"),
-        None,
-    )
+// Backend failures are tool-execution errors: report them as CallToolResult
+// with isError=true per MCP spec. Returning Err(ErrorData) produces a
+// protocol-level -32603, which some MCP clients misinterpret as a dead
+// connection and respond to by tearing down and respawning the server.
+fn backend_error(e: anyhow::Error) -> CallToolResult {
+    CallToolResult::error(vec![ContentBlock::text(format!(
+        "Failed to communicate with lightning node: {e}"
+    ))])
+}
+
+macro_rules! backend_try {
+    ($expr:expr) => {
+        match $expr {
+            Ok(v) => v,
+            Err(e) => return Ok(backend_error(e)),
+        }
+    };
 }
 
 fn has_feature(features_hex: &str, bits: &[usize]) -> bool {
@@ -68,11 +80,7 @@ impl NodeService {
 
     async fn call_backend(&self, method: &str, params: Value) -> Result<CallToolResult, ErrorData> {
         debug!("Tool call: {} with params: {}", method, params);
-        let result = self
-            .backend
-            .call(method, params)
-            .await
-            .map_err(backend_error)?;
+        let result = backend_try!(self.backend.call(method, params).await);
         to_call_result(result)
     }
 
@@ -562,11 +570,7 @@ impl NodeService {
         description = "list_splice_peers - List your connected peers that support option_splice (feature bit 62/63). Filters your actual channel partners, not the entire gossip map. Returns peers with their pubkey, connection status, and features. Use this to find which channels you can splice with."
     )]
     pub async fn list_splice_peers(&self) -> Result<CallToolResult, ErrorData> {
-        let result = self
-            .backend
-            .call("listpeers", json!({}))
-            .await
-            .map_err(backend_error)?;
+        let result = backend_try!(self.backend.call("listpeers", json!({})).await);
 
         let peers = result
             .get("peers")
@@ -604,11 +608,7 @@ impl NodeService {
         description = "list_splice_nodes - List all gossip-known nodes that support option_splice (feature bit 62/63). Use this to find new peers to connect and open splice-capable channels with. Returns nodes with their pubkey, alias, and addresses."
     )]
     pub async fn list_splice_nodes(&self) -> Result<CallToolResult, ErrorData> {
-        let result = self
-            .backend
-            .call("listnodes", json!({}))
-            .await
-            .map_err(backend_error)?;
+        let result = backend_try!(self.backend.call("listnodes", json!({})).await);
 
         let nodes = result
             .get("nodes")
@@ -652,22 +652,19 @@ impl NodeService {
         let peers_res = self.backend.call("listpeers", json!({})).await;
         let forwards_res = self.backend.call("listforwards", json!({})).await;
 
-        let channels = channels_res
-            .map_err(backend_error)?
+        let channels = backend_try!(channels_res)
             .get("channels")
             .and_then(|c| c.as_array())
             .cloned()
             .unwrap_or_default();
 
-        let peers = peers_res
-            .map_err(backend_error)?
+        let peers = backend_try!(peers_res)
             .get("peers")
             .and_then(|p| p.as_array())
             .cloned()
             .unwrap_or_default();
 
-        let forwards = forwards_res
-            .map_err(backend_error)?
+        let forwards = backend_try!(forwards_res)
             .get("forwards")
             .and_then(|f| f.as_array())
             .cloned()
@@ -766,10 +763,9 @@ impl NodeService {
         let feerates_res = self.backend.call("feerates", json!({"style": "perkb"})).await;
         let channels_res = self.backend.call("listpeerchannels", json!({})).await;
 
-        let info = info_res.map_err(backend_error)?;
-        let feerates = feerates_res.map_err(backend_error)?;
-        let channels = channels_res
-            .map_err(backend_error)?
+        let info = backend_try!(info_res);
+        let feerates = backend_try!(feerates_res);
+        let channels = backend_try!(channels_res)
             .get("channels")
             .and_then(|c| c.as_array())
             .cloned()
@@ -812,15 +808,13 @@ impl NodeService {
         let forwards_res = self.backend.call("listforwards", json!({})).await;
         let channels_res = self.backend.call("listpeerchannels", json!({})).await;
 
-        let forwards = forwards_res
-            .map_err(backend_error)?
+        let forwards = backend_try!(forwards_res)
             .get("forwards")
             .and_then(|f| f.as_array())
             .cloned()
             .unwrap_or_default();
 
-        let channels = channels_res
-            .map_err(backend_error)?
+        let channels = backend_try!(channels_res)
             .get("channels")
             .and_then(|c| c.as_array())
             .cloned()
@@ -890,11 +884,7 @@ impl NodeService {
             }
         };
 
-        let result = self
-            .backend
-            .call("listpeers", json!({}))
-            .await
-            .map_err(backend_error)?;
+        let result = backend_try!(self.backend.call("listpeers", json!({})).await);
 
         let peers = result
             .get("peers")
