@@ -5,3 +5,5 @@ cargo.lock
 # Release artifacts
 *.tar.gz
 *.zip
+# Local-only ops notes (never upstream)
+*.local.md

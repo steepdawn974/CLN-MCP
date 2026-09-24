@@ -555,12 +555,18 @@ impl NodeService {
     // === Splicing ===
 
     #[tool(
-        description = "splice - High-level splice script command (dev-splice). Move funds into/out of channels in a single onchain transaction. Supports wallet, channels, bitcoin addresses, and lease requests. Requires script_or_json. Optional dryrun, force_feerate, debug_log. Examples: 'wallet -> 10K; 100% -> 8338aef0' (splice in), '8338aef0 -> 50%' (splice out), '8338aef0 -> 50%; * -> 07bfddea' (move between channels)"
+        description = "splice - High-level splice script command (dev-splice). Move funds into/out of channels in a single onchain transaction. Supports wallet, channels, bitcoin addresses, and lease requests. Requires script_or_json. Optional dryrun, force_feerate, debug_log. Use ';' to separate segments (newlines are normalized automatically). Amounts use 'sat' suffix, e.g. 500000sat. Channel identifiers are channel_id prefixes (>=4 hex chars, must be unique) or short_channel_id is not accepted. Examples: 'wallet -> 500000sat; 100% -> 8338aef0' (splice in), '8338aef0 -> 50%' (splice out), '8338aef0 -> 50%; * -> 07bfddea' (move between channels)"
     )]
     pub async fn splice(
         &self,
-        Parameters(params): Parameters<SpliceParams>,
+        Parameters(mut params): Parameters<SpliceParams>,
     ) -> Result<CallToolResult, ErrorData> {
+        // dev-splice treats '\n' and ';' as segment delimiters, but a real
+        // newline inside the JSON-RPC string fails to compile at the node.
+        // Normalize script newlines to ';' (JSON payloads are untouched).
+        if !params.script_or_json.trim_start().starts_with('{') {
+            params.script_or_json = params.script_or_json.replace('\n', ";");
+        }
         self.call_backend("dev-splice", serialize_params(&params)).await
     }
 
