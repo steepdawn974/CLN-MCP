@@ -8,6 +8,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build
@@ -19,10 +22,14 @@ jobs:
             name: linux-x86_64
             artifact_name: cln-mcp-linux-x86_64
             artifact_pattern: "cln-mcp-linux-x86_64.tar.gz"
+          - os: ubuntu-24.04-arm
+            name: linux-aarch64
+            artifact_name: cln-mcp-linux-aarch64
+            artifact_pattern: "cln-mcp-linux-aarch64.tar.gz"
           - os: macos-latest
-            name: macos-x86_64
-            artifact_name: cln-mcp-macos-x86_64
-            artifact_pattern: "cln-mcp-macos-x86_64.tar.gz"
+            name: macos-aarch64
+            artifact_name: cln-mcp-macos-aarch64
+            artifact_pattern: "cln-mcp-macos-aarch64.tar.gz"
           - os: windows-latest
             name: windows-x86_64
             artifact_name: cln-mcp-windows-x86_64
@@ -78,3 +85,26 @@ jobs:
         name: ${{ matrix.artifact_name }}
         path: ${{ matrix.artifact_pattern }}
         if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+     - name: Download artifacts
+       uses: actions/download-artifact@v4
+       with:
+        pattern: cln-mcp-*
+        merge-multiple: true
+
+     - name: Generate checksums
+       run: sha256sum cln-mcp-*.tar.gz cln-mcp-*.zip > SHA256SUMS
+
+     - name: Create GitHub release and upload assets
+       env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       run: |
+        gh release create "${{ github.ref_name }}" \
+          --title "cln-mcp ${{ github.ref_name }}" \
+          --generate-notes \
+          cln-mcp-*.tar.gz cln-mcp-*.zip SHA256SUMS
