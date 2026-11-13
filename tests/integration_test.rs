@@ -564,11 +564,7 @@ async fn test_get_log_filtered() {
             level: Some("broken".to_string()),
         }))
         .await;
-    assert!(
-        result.is_ok(),
-        "get_log broken failed: {:?}",
-        result.err()
-    );
+    assert!(result.is_ok(), "get_log broken failed: {:?}", result.err());
 }
 
 #[tokio::test]

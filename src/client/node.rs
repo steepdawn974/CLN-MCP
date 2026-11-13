@@ -93,12 +93,15 @@ impl NodeService {
         self.call_backend("getinfo", json!({})).await
     }
 
-    #[tool(description = "listconfigs - List all configuration options of the Core Lightning node. Optionally filter by config name")]
+    #[tool(
+        description = "listconfigs - List all configuration options of the Core Lightning node. Optionally filter by config name"
+    )]
     pub async fn list_configs(
         &self,
         Parameters(params): Parameters<ListConfigsParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listconfigs", serialize_params(&params)).await
+        self.call_backend("listconfigs", serialize_params(&params))
+            .await
     }
 
     #[tool(
@@ -108,7 +111,8 @@ impl NodeService {
         &self,
         Parameters(params): Parameters<ListAddressesParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listaddresses", serialize_params(&params)).await
+        self.call_backend("listaddresses", serialize_params(&params))
+            .await
     }
 
     #[tool(
@@ -118,7 +122,8 @@ impl NodeService {
         &self,
         Parameters(params): Parameters<ListChannelsParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listchannels", serialize_params(&params)).await
+        self.call_backend("listchannels", serialize_params(&params))
+            .await
     }
 
     #[tool(
@@ -128,7 +133,8 @@ impl NodeService {
         &self,
         Parameters(params): Parameters<ListPeerChannelsParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listpeerchannels", serialize_params(&params)).await
+        self.call_backend("listpeerchannels", serialize_params(&params))
+            .await
     }
 
     #[tool(
@@ -138,7 +144,8 @@ impl NodeService {
         &self,
         Parameters(params): Parameters<ListClosedChannelsParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listclosedchannels", serialize_params(&params)).await
+        self.call_backend("listclosedchannels", serialize_params(&params))
+            .await
     }
 
     #[tool(
@@ -148,7 +155,8 @@ impl NodeService {
         &self,
         Parameters(params): Parameters<ListHtlcsParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listhtlcs", serialize_params(&params)).await
+        self.call_backend("listhtlcs", serialize_params(&params))
+            .await
     }
 
     #[tool(
@@ -158,7 +166,8 @@ impl NodeService {
         &self,
         Parameters(params): Parameters<ListPaysParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listpays", serialize_params(&params)).await
+        self.call_backend("listpays", serialize_params(&params))
+            .await
     }
 
     #[tool(
@@ -168,7 +177,8 @@ impl NodeService {
         &self,
         Parameters(params): Parameters<ListSendPaysParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listsendpays", serialize_params(&params)).await
+        self.call_backend("listsendpays", serialize_params(&params))
+            .await
     }
 
     #[tool(
@@ -178,7 +188,8 @@ impl NodeService {
         &self,
         Parameters(params): Parameters<ListForwardsParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listforwards", serialize_params(&params)).await
+        self.call_backend("listforwards", serialize_params(&params))
+            .await
     }
 
     #[tool(
@@ -188,7 +199,8 @@ impl NodeService {
         &self,
         Parameters(params): Parameters<ListInvoicesParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listinvoices", serialize_params(&params)).await
+        self.call_backend("listinvoices", serialize_params(&params))
+            .await
     }
 
     #[tool(
@@ -198,7 +210,8 @@ impl NodeService {
         &self,
         Parameters(params): Parameters<ListPeersParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listpeers", serialize_params(&params)).await
+        self.call_backend("listpeers", serialize_params(&params))
+            .await
     }
 
     #[tool(
@@ -208,7 +221,8 @@ impl NodeService {
         &self,
         Parameters(params): Parameters<ListNodesParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listnodes", serialize_params(&params)).await
+        self.call_backend("listnodes", serialize_params(&params))
+            .await
     }
 
     #[tool(
@@ -218,34 +232,46 @@ impl NodeService {
         &self,
         Parameters(params): Parameters<ListFundsParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listfunds", serialize_params(&params)).await
+        self.call_backend("listfunds", serialize_params(&params))
+            .await
     }
 
-    #[tool(description = "listoffers - List all bolt12 offers on the node. Optionally filter by offer_id or active_only")]
+    #[tool(
+        description = "listoffers - List all bolt12 offers on the node. Optionally filter by offer_id or active_only"
+    )]
     pub async fn list_offers(
         &self,
         Parameters(params): Parameters<ListOffersParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listoffers", serialize_params(&params)).await
+        self.call_backend("listoffers", serialize_params(&params))
+            .await
     }
 
-    #[tool(description = "listdatastore - List data stored in the node datastore. Optionally filter by key")]
+    #[tool(
+        description = "listdatastore - List data stored in the node datastore. Optionally filter by key"
+    )]
     pub async fn list_datastore(
         &self,
         Parameters(params): Parameters<ListDatastoreParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("listdatastore", serialize_params(&params)).await
+        self.call_backend("listdatastore", serialize_params(&params))
+            .await
     }
 
-    #[tool(description = "feerates - Look up fee rates for various styles. Requires style: perkb (satoshis per 1000 virtual bytes) or perkw (satoshis per 1000 weight)")]
+    #[tool(
+        description = "feerates - Look up fee rates for various styles. Requires style: perkb (satoshis per 1000 virtual bytes) or perkw (satoshis per 1000 weight)"
+    )]
     pub async fn feerates(
         &self,
         Parameters(params): Parameters<FeeratesParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.call_backend("feerates", serialize_params(&params)).await
+        self.call_backend("feerates", serialize_params(&params))
+            .await
     }
 
-    #[tool(description = "getlog - Show log entries from the node. Optionally filter by level: broken, unusual, info, debug, trace, or io (default info)")]
+    #[tool(
+        description = "getlog - Show log entries from the node. Optionally filter by level: broken, unusual, info, debug, trace, or io (default info)"
+    )]
     pub async fn get_log(
         &self,
         Parameters(params): Parameters<GetLogParams>,
@@ -530,9 +556,7 @@ impl NodeService {
             .await
     }
 
-    #[tool(
-        description = "askrene_remove_layer - Remove an askrene layer. Requires layer name"
-    )]
+    #[tool(description = "askrene_remove_layer - Remove an askrene layer. Requires layer name")]
     pub async fn askrene_remove_layer(
         &self,
         Parameters(params): Parameters<AskreneRemoveLayerParams>,
@@ -567,7 +591,8 @@ impl NodeService {
         if !params.script_or_json.trim_start().starts_with('{') {
             params.script_or_json = params.script_or_json.replace('\n', ";");
         }
-        self.call_backend("dev-splice", serialize_params(&params)).await
+        self.call_backend("dev-splice", serialize_params(&params))
+            .await
     }
 
     // === Splice peer discovery ===
@@ -686,7 +711,8 @@ impl NodeService {
             .collect();
 
         // Aggregate forwards by out_channel
-        let mut fwd_by_channel: std::collections::HashMap<String, (u64, u64)> = std::collections::HashMap::new();
+        let mut fwd_by_channel: std::collections::HashMap<String, (u64, u64)> =
+            std::collections::HashMap::new();
         for fwd in &forwards {
             if fwd.get("status").and_then(|s| s.as_str()) == Some("settled") {
                 if let Some(out_ch) = fwd.get("out_channel").and_then(|c| c.as_str()) {
@@ -707,13 +733,25 @@ impl NodeService {
             .iter()
             .map(|ch| {
                 let peer_id = ch.get("peer_id").and_then(|v| v.as_str()).unwrap_or("");
-                let scid = ch.get("short_channel_id").and_then(|v| v.as_str()).unwrap_or("");
+                let scid = ch
+                    .get("short_channel_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 let state = ch.get("state").and_then(|v| v.as_str()).unwrap_or("");
                 let to_us = ch.get("to_us_msat").and_then(|v| v.as_u64()).unwrap_or(0);
                 let total = ch.get("total_msat").and_then(|v| v.as_u64()).unwrap_or(0);
-                let connected = ch.get("peer_connected").and_then(|v| v.as_bool()).unwrap_or(false);
-                let fee_base = ch.get("fee_base_msat").and_then(|v| v.as_u64()).unwrap_or(0);
-                let fee_ppm = ch.get("fee_proportional_millionths").and_then(|v| v.as_u64()).unwrap_or(0);
+                let connected = ch
+                    .get("peer_connected")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let fee_base = ch
+                    .get("fee_base_msat")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let fee_ppm = ch
+                    .get("fee_proportional_millionths")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
 
                 total_capacity += total;
                 if state == "CHANNELD_NORMAL" {
@@ -766,7 +804,10 @@ impl NodeService {
     )]
     pub async fn node_health(&self) -> Result<CallToolResult, ErrorData> {
         let info_res = self.backend.call("getinfo", json!({})).await;
-        let feerates_res = self.backend.call("feerates", json!({"style": "perkb"})).await;
+        let feerates_res = self
+            .backend
+            .call("feerates", json!({"style": "perkb"}))
+            .await;
         let channels_res = self.backend.call("listpeerchannels", json!({})).await;
 
         let info = backend_try!(info_res);
@@ -827,7 +868,8 @@ impl NodeService {
             .unwrap_or_default();
 
         // Aggregate settled forwards by out_channel
-        let mut fwd_by_channel: std::collections::HashMap<String, (u64, u64)> = std::collections::HashMap::new();
+        let mut fwd_by_channel: std::collections::HashMap<String, (u64, u64)> =
+            std::collections::HashMap::new();
         let mut total_fees: u64 = 0;
         let mut total_forwards: u64 = 0;
 
